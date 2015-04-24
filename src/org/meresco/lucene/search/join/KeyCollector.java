@@ -27,17 +27,14 @@ package org.meresco.lucene.search.join;
 
 import java.io.IOException;
 
-import org.apache.lucene.index.AtomicReaderContext;
-import org.apache.lucene.search.DocIdSet;
+import org.apache.lucene.index.LeafReaderContext;
 import org.apache.lucene.search.Scorer;
-import org.apache.lucene.util.OpenBitSet;
 import org.meresco.lucene.search.SubCollector;
-
 
 public class KeyCollector extends SubCollector {
     protected String keyName;
     private int[] keyValuesArray;
-    protected OpenBitSet currentKeySet = new OpenBitSet();
+    protected OpenBitSet currentKeySet = new JavaUtilBitSet();
     protected int biggestKeyFound = 0;
 
     public KeyCollector(String keyName) {
@@ -47,8 +44,8 @@ public class KeyCollector extends SubCollector {
     @Override
     public void collect(int docId) throws IOException {
         if (this.keyValuesArray != null) {
-        	int value = this.keyValuesArray[docId];
-        	if (value > 0) {
+            int value = this.keyValuesArray[docId];
+            if (value > 0) {
                 this.currentKeySet.set(value);
                 if (value > this.biggestKeyFound) {
                     this.biggestKeyFound = value;
@@ -58,7 +55,7 @@ public class KeyCollector extends SubCollector {
     }
 
     @Override
-    public void setNextReader(AtomicReaderContext context) throws IOException {
+    public void setNextReader(LeafReaderContext context) throws IOException {
         keyValuesArray = KeyValuesCache.get(context, keyName);
     }
 
@@ -75,7 +72,7 @@ public class KeyCollector extends SubCollector {
         return this.currentKeySet;
     }
 
-	@Override
-	public void complete() throws IOException {
-	}
+    @Override
+    public void complete() throws IOException {
+    }
 }

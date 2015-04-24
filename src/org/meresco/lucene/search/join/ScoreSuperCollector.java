@@ -106,7 +106,7 @@ class ScoreSubCollector extends SubCollector {
     }
 
     @Override
-    public void setNextReader(AtomicReaderContext context) throws IOException {
+    public void setNextReader(LeafReaderContext context) throws IOException {
         this.keyValues = context.reader().getNumericDocValues(parent.keyName);
     }
 

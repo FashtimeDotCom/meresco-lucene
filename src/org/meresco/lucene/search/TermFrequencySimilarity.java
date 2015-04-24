@@ -47,7 +47,7 @@ public class TermFrequencySimilarity extends Similarity {
     }
 
     @Override
-    public SimScorer simScorer(SimWeight weight, AtomicReaderContext context) throws IOException {
+    public SimScorer simScorer(SimWeight weight, LeafReaderContext context) throws IOException {
         final TermFrequencySimilarityWeight tfsWeight = (TermFrequencySimilarityWeight) weight;
         return new SimScorer() {
 

@@ -31,9 +31,9 @@ import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicReference;
 
-import org.apache.lucene.index.AtomicReaderContext;
 import org.apache.lucene.index.DocValues;
 import org.apache.lucene.index.IndexReaderContext;
+import org.apache.lucene.index.LeafReaderContext;
 import org.apache.lucene.index.NumericDocValues;
 import org.apache.lucene.index.ReaderUtil;
 import org.apache.lucene.search.Scorer;
@@ -80,8 +80,8 @@ public class DeDupFilterSuperCollector extends SuperCollector<DeDupFilterSubColl
         if (this.topLevelReaderContext == null)
             this.topLevelReaderContext = ReaderUtil.getTopLevelContext(super.subs.get(0).context);
 
-        List<AtomicReaderContext> leaves = this.topLevelReaderContext.leaves();
-        AtomicReaderContext context = leaves.get(ReaderUtil.subIndex(docId, leaves));
+        List<LeafReaderContext> leaves = this.topLevelReaderContext.leaves();
+        LeafReaderContext context = leaves.get(ReaderUtil.subIndex(docId, leaves));
         NumericDocValues docValues = context.reader().getNumericDocValues(this.keyName);
         if (docValues == null)
             return null;
@@ -102,9 +102,10 @@ class DeDupFilterSubCollector extends SubCollector {
     private NumericDocValues sortByValues;
     private NumericDocValues keyValues;
     private int totalHits = 0;
-    AtomicReaderContext context;
+    LeafReaderContext context;
 
-    public DeDupFilterSubCollector(String keyName, String sortByFieldName, SubCollector delegate, ConcurrentHashMap<Long, AtomicReference<DeDupFilterSubCollector.Key>> keys) throws IOException {
+    public DeDupFilterSubCollector(String keyName, String sortByFieldName, SubCollector delegate,
+            ConcurrentHashMap<Long, AtomicReference<DeDupFilterSubCollector.Key>> keys) throws IOException {
         super();
         this.delegate = delegate;
         this.keys = keys;
@@ -113,7 +114,7 @@ class DeDupFilterSubCollector extends SubCollector {
     }
 
     @Override
-    public void setNextReader(AtomicReaderContext context) throws IOException {
+    public void setNextReader(LeafReaderContext context) throws IOException {
         this.context = context;
         this.delegate.setNextReader(context);
         this.currentDocBase = context.docBase;
@@ -172,10 +173,10 @@ class DeDupFilterSubCollector extends SubCollector {
         this.delegate.setScorer(scorer);
     }
 
-    @Override
-    public boolean acceptsDocsOutOfOrder() {
-        return this.delegate.acceptsDocsOutOfOrder();
-    }
+//    @Override
+//    public boolean acceptsDocsOutOfOrder() {
+//        return this.delegate.acceptsDocsOutOfOrder();
+//    }
 
     @Override
     public void complete() throws IOException {

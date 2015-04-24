@@ -27,7 +27,7 @@ package org.meresco.lucene.search;
 
 import java.io.IOException;
 
-import org.apache.lucene.index.AtomicReaderContext;
+import org.apache.lucene.index.LeafReaderContext;
 import org.apache.lucene.search.Collector;
 import org.apache.lucene.search.Scorer;
 
@@ -43,7 +43,7 @@ public abstract class DelegatingSubCollector<CollectorType extends Collector, Su
     }
 
     @Override
-    public void setNextReader(AtomicReaderContext context) throws IOException {
+    public void setNextReader(LeafReaderContext context) throws IOException {
         this.delegate.setNextReader(context);
     }
 

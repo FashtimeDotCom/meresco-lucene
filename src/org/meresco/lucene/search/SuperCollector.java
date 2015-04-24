@@ -61,4 +61,9 @@ public abstract class SuperCollector<SubCollectorType extends SubCollector> {
     abstract protected SubCollectorType createSubCollector() throws IOException;
 
     abstract public void complete() throws IOException;
+
+    public boolean needsScores() {
+        // TODO Auto-generated method stub
+        return false;
+    }
 }

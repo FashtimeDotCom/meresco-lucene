@@ -27,14 +27,15 @@ package org.meresco.lucene.search;
 
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorCompletionService;
 import java.util.concurrent.ExecutorService;
 
-import org.apache.lucene.index.AtomicReaderContext;
 import org.apache.lucene.index.DirectoryReader;
+import org.apache.lucene.index.LeafReaderContext;
+import org.apache.lucene.search.BulkScorer;
+import org.apache.lucene.search.CollectionTerminatedException;
 import org.apache.lucene.search.Filter;
 import org.apache.lucene.search.IndexSearcher;
 import org.apache.lucene.search.Query;
@@ -43,28 +44,28 @@ import org.apache.lucene.search.Weight;
 public class SuperIndexSearcher extends IndexSearcher {
 
     private ExecutorService executor;
-    private List<List<AtomicReaderContext>> grouped_leaves;
+    private List<List<LeafReaderContext>> grouped_leaves;
 
     public SuperIndexSearcher(DirectoryReader reader, ExecutorService executor, int tasks) {
         super(reader);
         this.executor = executor;
         this.grouped_leaves = this.group_leaves(reader.leaves(), tasks);
-        for (List<AtomicReaderContext> l : this.grouped_leaves) {
+        for (List<LeafReaderContext> l : this.grouped_leaves) {
             int t = 0;
-            for (AtomicReaderContext ctx : l)
+            for (LeafReaderContext ctx : l)
                 t += ctx.reader().numDocs();
             // System.out.print(" " + t + " ");
         }
         // System.out.println();
     }
 
-    private List<List<AtomicReaderContext>> group_leaves(List<AtomicReaderContext> leaves, int tasks) {
-        List<List<AtomicReaderContext>> slices = new ArrayList<List<AtomicReaderContext>>(tasks);
+    private List<List<LeafReaderContext>> group_leaves(List<LeafReaderContext> leaves, int tasks) {
+        List<List<LeafReaderContext>> slices = new ArrayList<List<LeafReaderContext>>(tasks);
         for (int i = 0; i < tasks; i++)
-            slices.add(new ArrayList<AtomicReaderContext>());
+            slices.add(new ArrayList<LeafReaderContext>());
         int sizes[] = new int[tasks];
         int max_i = 0;
-        for (AtomicReaderContext context : leaves) {
+        for (LeafReaderContext context : leaves) {
             int smallest_i = find_smallest_slice(sizes);
             slices.get(smallest_i).add(context);
             sizes[smallest_i] += context.reader().numDocs();
@@ -85,11 +86,10 @@ public class SuperIndexSearcher extends IndexSearcher {
         return smallest_i;
     }
 
-    public void search(Query q, Filter f, SuperCollector<?> c) throws IOException, InterruptedException,
-            ExecutionException {
-        Weight weight = super.createNormalizedWeight(wrapFilter(q, f));
+    public void search(Query q, Filter f, SuperCollector<?> c) throws IOException, InterruptedException, ExecutionException {
+        Weight weight = super.createNormalizedWeight(wrapFilter(q, f), c.needsScores());
         ExecutorCompletionService<String> ecs = new ExecutorCompletionService<String>(this.executor);
-        for (List<AtomicReaderContext> leaf_group : this.grouped_leaves.subList(1, this.grouped_leaves.size()))
+        for (List<LeafReaderContext> leaf_group : this.grouped_leaves.subList(1, this.grouped_leaves.size()))
             ecs.submit(new SearchTask(leaf_group, weight, c.subCollector()), "Done");
         new SearchTask(this.grouped_leaves.get(0), weight, c.subCollector()).run();
         for (int i = 0; i < this.grouped_leaves.size() - 1; i++) {
@@ -99,11 +99,11 @@ public class SuperIndexSearcher extends IndexSearcher {
     }
 
     public class SearchTask implements Runnable {
-        private List<AtomicReaderContext> contexts;
+        private List<LeafReaderContext> contexts;
         private Weight weight;
         private SubCollector subCollector;
 
-        public SearchTask(List<AtomicReaderContext> contexts, Weight weight, SubCollector subCollector) {
+        public SearchTask(List<LeafReaderContext> contexts, Weight weight, SubCollector subCollector) {
             this.contexts = contexts;
             this.weight = weight;
             this.subCollector = subCollector;
@@ -112,7 +112,17 @@ public class SuperIndexSearcher extends IndexSearcher {
         @Override
         public void run() {
             try {
-                SuperIndexSearcher.this.search(this.contexts, this.weight, this.subCollector);
+                // SuperIndexSearcher.this.search(this.contexts, this.weight, this.subCollector);  // replaced by:
+                for (LeafReaderContext ctx : contexts) { // search each subreader
+                    BulkScorer scorer = weight.bulkScorer(ctx, ctx.reader().getLiveDocs());
+                    if (scorer != null) {
+                        try {
+                            subCollector.setNextReader(ctx);
+                            scorer.score(subCollector);
+                        } catch (CollectionTerminatedException e) {
+                        }
+                    }
+                }
                 this.subCollector.complete();
             } catch (IOException e) {
                 throw new RuntimeException(e);
@@ -128,7 +138,7 @@ public class SuperIndexSearcher extends IndexSearcher {
         return find_smallest_slice(sizes);
     }
 
-    public List<List<AtomicReaderContext>> group_leaves_test(List<AtomicReaderContext> leaves, int tasks) {
+    public List<List<LeafReaderContext>> group_leaves_test(List<LeafReaderContext> leaves, int tasks) {
         return group_leaves(leaves, tasks);
     }
 }

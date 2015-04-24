@@ -88,7 +88,7 @@ class MultiSubCollector extends SubCollector {
     }
 
     @Override
-    public void setNextReader(AtomicReaderContext context) throws IOException {
+    public void setNextReader(LeafReaderContext context) throws IOException {
         for (SubCollector c : this.subCollectors) {
             c.setNextReader(context);
         }

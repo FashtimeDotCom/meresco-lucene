@@ -30,15 +30,15 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.WeakHashMap;
 
-import org.apache.lucene.index.AtomicReader;
-import org.apache.lucene.index.AtomicReaderContext;
+import org.apache.lucene.index.LeafReader;
+import org.apache.lucene.index.LeafReaderContext;
 import org.apache.lucene.index.NumericDocValues;
 
 public class KeyValuesCache {
     private static Map<Object, Map<String, CacheValue>> cache = new WeakHashMap<Object, Map<String, CacheValue>>();
 
-    public static int[] get(AtomicReaderContext context, String keyName) throws IOException {
-        AtomicReader reader = context.reader();
+    public static int[] get(LeafReaderContext context, String keyName) throws IOException {
+        LeafReader reader = context.reader();
         NumericDocValues ndv = reader.getNumericDocValues(keyName);
         if (ndv == null) {
             return null;
@@ -49,13 +49,13 @@ public class KeyValuesCache {
         if (!cacheValue.newValue) {
             return keyValues;
         }
-        for (int i = 0; i <  reader.maxDoc(); i++) {
+        for (int i = 0; i < reader.maxDoc(); i++) {
             keyValues[i] = (int) ndv.get(i);
         }
         return keyValues;
     }
 
-    private static synchronized CacheValue safeGet(AtomicReader reader, String keyName) {
+    private static synchronized CacheValue safeGet(LeafReader reader, String keyName) {
         Map<String, CacheValue> fieldCache = cache.get(reader.getCoreCacheKey());
         if (fieldCache == null) {
             fieldCache = new HashMap<String, CacheValue>();

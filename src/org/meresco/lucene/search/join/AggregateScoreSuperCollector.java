@@ -28,7 +28,7 @@ package org.meresco.lucene.search.join;
 import java.io.IOException;
 import java.util.List;
 
-import org.apache.lucene.index.AtomicReaderContext;
+import org.apache.lucene.index.LeafReaderContext;
 import org.apache.lucene.search.Scorer;
 import org.apache.lucene.search.Weight;
 import org.meresco.lucene.search.SubCollector;
@@ -82,7 +82,7 @@ class AggregateScoreSubCollector extends SubCollector {
     }
 
     @Override
-    public void setNextReader(AtomicReaderContext context) throws IOException {
+    public void setNextReader(LeafReaderContext context) throws IOException {
         this.keyValuesArray = KeyValuesCache.get(context, keyName);
         this.delegate.setNextReader(context);
     }

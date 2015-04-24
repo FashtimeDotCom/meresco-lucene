@@ -46,7 +46,7 @@ public class KeyFilter extends Filter {
 	}
 
 	@Override
-	public DocIdSet getDocIdSet(final AtomicReaderContext context,
+	public DocIdSet getDocIdSet(final LeafReaderContext context,
 			Bits acceptDocs) throws IOException {
 		return BitsFilteredDocIdSet.wrap(new DocIdSet() {
 			@Override
