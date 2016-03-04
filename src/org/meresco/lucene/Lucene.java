@@ -91,7 +91,6 @@ import org.meresco.lucene.LuceneResponse.DedupHit;
 import org.meresco.lucene.LuceneResponse.DrilldownData;
 import org.meresco.lucene.LuceneResponse.GroupingHit;
 import org.meresco.lucene.LuceneResponse.Hit;
-import org.meresco.lucene.LuceneSettings.ClusterField;
 import org.meresco.lucene.QueryConverter.FacetRequest;
 import org.meresco.lucene.search.DeDupFilterSuperCollector;
 import org.meresco.lucene.search.FacetSuperCollector;
@@ -110,8 +109,8 @@ import org.meresco.lucene.search.join.AggregateScoreSuperCollector;
 import org.meresco.lucene.search.join.KeySuperCollector;
 import org.meresco.lucene.search.join.ScoreSuperCollector;
 
-public class Lucene {
 
+public class Lucene {
     public static final String ID_FIELD = "__id__";
     IndexWriter indexWriter;
     DirectoryTaxonomyWriter taxoWriter;
@@ -291,8 +290,12 @@ public class Lucene {
                 
                 totalHits = collectors.topCollector.getTotalHits();
                 if (q.clustering) {
+                    ClusterConfig clusterConfig = q.clusterConfig;
+                    if (clusterConfig == null) {
+                    	clusterConfig = settings.clusterConfig;
+                    }
                     t1 = System.currentTimeMillis();
-                    hits = clusterTopDocsResponse(q, collectors, times, reference.searcher.getIndexReader());
+                    hits = clusterTopDocsResponse(q, collectors, times, reference.searcher.getIndexReader(), clusterConfig);
                     times.put("totalClusterTime", System.currentTimeMillis() - t1);
                 } else {
                     t1 = System.currentTimeMillis();
@@ -333,13 +336,12 @@ public class Lucene {
         }
     }
 
-    private List<Hit> clusterTopDocsResponse(QueryData q, Collectors collectors, Map<String, Long> times, IndexReader indexReader) throws IOException {
+    private List<Hit> clusterTopDocsResponse(QueryData q, Collectors collectors, Map<String, Long> times, IndexReader indexReader, ClusterConfig clusterConfig) throws IOException {
         int totalHits = collectors.topCollector.getTotalHits();
-                
         List<LuceneResponse.Hit> hits = new ArrayList<>();
-        double epsilon = interpolateEpsilon(totalHits, q.stop - q.start);
-        MerescoClusterer clusterer = new MerescoClusterer(indexReader, epsilon, settings.clusteringMinPoints);
-        for (ClusterField clusterField : settings.clusterFields)
+        double epsilon = interpolateEpsilon(totalHits, q.stop - q.start, clusterConfig);
+        MerescoClusterer clusterer = new MerescoClusterer(indexReader, epsilon, clusterConfig.clusteringMinPoints);
+        for (ClusterConfig.ClusterField clusterField : clusterConfig.clusterFields)
             clusterer.registerField(clusterField.fieldname, clusterField.weight, clusterField.filterValue);
         TopDocs topDocs = collectors.topCollector.topDocs(q.start);
         long t0 = System.currentTimeMillis();
@@ -487,7 +489,7 @@ public class Lucene {
         Collectors allCollectors = new Collectors();
         SuperCollector<?> resultsCollector;
         if (q.clustering) {
-            allCollectors.topCollector = topCollector(q.start, stop + settings.clusterMoreRecords, q.sort);
+            allCollectors.topCollector = topCollector(q.start, stop + settings.clusterConfig.clusterMoreRecords, q.sort);
             resultsCollector = allCollectors.topCollector;
         } else if (q.groupingField != null) {
             allCollectors.topCollector = topCollector(q.start, stop * 10, q.sort);
@@ -759,9 +761,9 @@ public class Lucene {
         }
     }
 
-    double interpolateEpsilon(int hits, int slice) {
-        double eps = settings.clusteringEps * (hits - slice) / settings.clusterMoreRecords;
-        return Math.max(Math.min(eps, settings.clusteringEps), 0.0);
+    double interpolateEpsilon(int hits, int slice, ClusterConfig clusterConfig) {
+        double eps = clusterConfig.clusteringEps * (hits - slice) / clusterConfig.clusterMoreRecords;
+        return Math.max(Math.min(eps, clusterConfig.clusteringEps), 0.0);
     }
     
 
